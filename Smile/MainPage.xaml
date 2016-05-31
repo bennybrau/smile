@@ -1,0 +1,51 @@
+﻿<Page
+    x:Class="Smile.MainPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Smile"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d" Loaded="Page_Loaded" Unloaded="Page_Unloaded">
+
+    <Grid Background="Black">
+        <Grid.Resources>
+            <Storyboard x:Name="FadeInText" Completed="FadeInText_Completed">
+                <DoubleAnimation Storyboard.TargetName="SmileTitle"
+                                 Storyboard.TargetProperty="Opacity"
+                                 From="0" To="1" Duration="0:0:4"/>
+                <DoubleAnimation Storyboard.TargetName="PolaroidLogo"
+                                 Storyboard.TargetProperty="Opacity"
+                                 From="0" To="1" Duration="0:0:1"/>
+            </Storyboard>
+            <Storyboard x:Name="FadeInCamera" Completed="FadeInCamera_Completed">
+                <DoubleAnimation Storyboard.TargetName="CameraImage"
+                                 Storyboard.TargetProperty="Opacity"
+                                 From="0" To="1" Duration="0:0:4"/>
+            </Storyboard>
+            <Storyboard x:Name="FlashFade" Completed="FlashFade_Completed">
+                <DoubleAnimation Storyboard.TargetName="FlashEffectCanvas"
+                                 Storyboard.TargetProperty="Opacity"
+                                 From="1" To="0" Duration="0:0:1"/>
+            </Storyboard>
+            <Storyboard x:Name="FadeInSnappedPicture">
+                <DoubleAnimation Storyboard.TargetName="SnappedPicture"
+                                 Storyboard.TargetProperty="Opacity"
+                                 From="0" To="1" Duration="0:0:2" />
+                <DoubleAnimation Storyboard.TargetName="ResizedPhoto"
+                                 Storyboard.TargetProperty="Opacity"
+                                 From="0" To="1" Duration="0:0:2" />
+            </Storyboard>
+        </Grid.Resources>
+        <MediaElement x:Name="CameraSound" Volume="0.5" AutoPlay="False" IsLooping="False" Source="Audio/polaroid-camera-take-picture-01.mp3" MediaOpened="CameraSound_MediaOpened" IsFullWindow="False" Width="10" Height="10" />
+        <Image Opacity="0" x:Name="PolaroidLogo" Source="Images/polaroid_logo.jpg" Width="360" Height="73" Margin="900,600,0,0"></Image>
+        <TextBlock Opacity="0" x:Name="SmileTitle" FontSize="72" HorizontalAlignment="Center" VerticalAlignment="Center" Text="Smile!"/>
+        <Image Grid.Row="0" x:Name="CameraImage" Source="Images/polaroid_snap_1080p.jpg" Width="1920" Height="1080" Opacity="0"></Image>
+        <TextBlock Opacity="0" x:Name="CountdownValue" FontSize="60" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,400"></TextBlock>
+        <Canvas Grid.Row="0" x:Name="FaceBoundaryCanvas" Width="1920" Height="1080" Background="Transparent">
+            <Rectangle x:Name="FaceBoundary" Visibility="Collapsed" Stroke="GreenYellow" StrokeThickness="4"></Rectangle>
+        </Canvas>
+        <Canvas Grid.Row="0" x:Name="FlashEffectCanvas" Width="1920" Height="1080" Background="White" Visibility="Collapsed"></Canvas>
+        <Image x:Name="SnappedPicture" Width="1920" Height="1080" Opacity="0"></Image>
+        <Image x:Name="ResizedPhoto"  Width="477" Height="421" Opacity="0" Margin="290,180,0,0"></Image>
+    </Grid>
+</Page>
