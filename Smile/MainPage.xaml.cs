@@ -35,10 +35,12 @@ namespace Smile
         FaceFrameReader faceReader = null;
         FaceFrameResult curFaceResult = null;
         RectI faceBoundsInColorSpace;
+        private bool showFaceBoundaryBox = true;
 
         private WriteableBitmap curColorBitmap = null;
         private StorageFile curSnapshot = null;
-        //private ColorFrame curColorFrame = null;
+
+        private Random rnd = new Random();
 
         public string CountdownVal
         {
@@ -77,27 +79,31 @@ namespace Smile
 
         private void FaceReader_FrameArrived(FaceFrameReader sender, FaceFrameArrivedEventArgs args)
         {
-            using (FaceFrame frame = args.FrameReference.AcquireFrame())
+            if (this.showFaceBoundaryBox)
             {
-                if (frame == null) return;
-                curFaceResult = frame.FaceFrameResult;
-                if (curFaceResult == null) return;
-                this.faceBoundsInColorSpace = curFaceResult.FaceBoundingBoxInColorSpace;
+                using (FaceFrame frame = args.FrameReference.AcquireFrame())
+                {
+                    if (frame == null) return;
+                    curFaceResult = frame.FaceFrameResult;
+                    if (curFaceResult == null) return;
+                    this.faceBoundsInColorSpace = curFaceResult.FaceBoundingBoxInColorSpace;
 
-                if ((this.faceBoundsInColorSpace.Left > 0) && (this.faceBoundsInColorSpace.Top > 0) && 
-                    (this.faceBoundsInColorSpace.Right > 0) && (this.faceBoundsInColorSpace.Bottom > 0))
-                {
-                    this.FaceBoundary.Width = (this.faceBoundsInColorSpace.Right - this.faceBoundsInColorSpace.Left);
-                    this.FaceBoundary.Height = (this.faceBoundsInColorSpace.Bottom - this.faceBoundsInColorSpace.Top);
-                    Canvas.SetLeft(this.FaceBoundary, this.faceBoundsInColorSpace.Left);
-                    Canvas.SetTop(this.FaceBoundary, this.faceBoundsInColorSpace.Top);
-                    this.FaceBoundary.Visibility = Visibility.Visible;
-                }
-                else
-                {
-                    this.FaceBoundary.Visibility = Visibility.Collapsed;
+                    if ((this.faceBoundsInColorSpace.Left > 0) && (this.faceBoundsInColorSpace.Top > 0) &&
+                        (this.faceBoundsInColorSpace.Right > 0) && (this.faceBoundsInColorSpace.Bottom > 0))
+                    {
+                        this.FaceBoundary.Width = (this.faceBoundsInColorSpace.Right - this.faceBoundsInColorSpace.Left);
+                        this.FaceBoundary.Height = (this.faceBoundsInColorSpace.Bottom - this.faceBoundsInColorSpace.Top);
+                        Canvas.SetLeft(this.FaceBoundary, this.faceBoundsInColorSpace.Left);
+                        Canvas.SetTop(this.FaceBoundary, this.faceBoundsInColorSpace.Top);
+                        this.FaceBoundary.Visibility = Visibility.Visible;
+                    }
+                    else
+                    {
+                        this.FaceBoundary.Visibility = Visibility.Collapsed;
+                    }
                 }
             }
+            
         }
 
         private void MultiSrcFrameReader_MultiSourceFrameArrived(MultiSourceFrameReader sender, MultiSourceFrameArrivedEventArgs args)
@@ -131,8 +137,9 @@ namespace Smile
 
         private void FadeInText_Completed(object sender, object e)
         {
-            //Delay and show Camera
-            Pause(5000);
+            //Delay and show Camera  TODO...need to wait until user is "engaged"...not just delay
+
+            //Pause(10000);
             this.SmileTitle.Opacity = 0;
             this.PolaroidLogo.Opacity = 0;
             FadeInCamera.Begin();
@@ -205,24 +212,37 @@ namespace Smile
 
         private async void FlashFade_Completed(object sender, object e)
         {
-            //save image from color stream to file.
-            //StorageFile snap = await SaveSnapshot("smileTest", FileFormat.Png);
-            ///if (snap != null)
-            //{
-            //System.Uri uri = new System.Uri("ms-appdata:///local/" + snap.Name);
+            //crop and create composite image to show
             WriteableBitmap original = await BitmapFactory.New(1, 1).FromPixelBuffer(this.curColorBitmap.PixelBuffer, this.curColorBitmap.PixelWidth, this.curColorBitmap.PixelHeight);
-                
-                WriteableBitmap background = await BitmapFactory.New(1, 1).FromContent(new System.Uri("ms-appx:///Images/hand_polaroid_black.jpg"));
-                
-                WriteableBitmap cropped = original.Crop(this.faceBoundsInColorSpace.Left - 100, this.faceBoundsInColorSpace.Top - 120, 
+            WriteableBitmap background = await BitmapFactory.New(1, 1).FromContent(new System.Uri("ms-appx:///Images/hand_polaroid_black.jpg"));
+            WriteableBitmap cropped = original.Crop(this.faceBoundsInColorSpace.Left - 100, this.faceBoundsInColorSpace.Top - 120, 
                                 (this.faceBoundsInColorSpace.Right - this.faceBoundsInColorSpace.Left + 200), 
                                 (this.faceBoundsInColorSpace.Bottom - this.faceBoundsInColorSpace.Top + 240));
             WriteableBitmap sizedImage = cropped.Resize(810, 830, WriteableBitmapExtensions.Interpolation.Bilinear);
             background.Blit(new Rect(825, 555, 810, 830), sizedImage, new Rect(0, 0, 810, 830), WriteableBitmapExtensions.BlendMode.None);
 
+            //caption
+            WriteableBitmap textBmp = await GetRandomCaption();
+            background.Blit(new Rect(900, 1450, 580, 85), textBmp, new Rect(0, 0, 575, 85), WriteableBitmapExtensions.BlendMode.Alpha);
+
             this.SnappedPicture.Source = background;
-                this.FadeInSnappedPicture.Begin();
-            //}
+            this.FadeInSnappedPicture.Begin();
+        }
+
+        private async Task<WriteableBitmap> GetRandomCaption()
+        {
+            int val = rnd.Next(1, 4);
+            switch (val)
+            {
+                case 1:
+                    return await BitmapFactory.New(1, 1).FromContent(new System.Uri("ms-appx:///Images/beunmissable-text.png"));
+                case 2:
+                    return await BitmapFactory.New(1, 1).FromContent(new System.Uri("ms-appx:///Images/cannes2016-text.png"));
+                case 3:
+                default:
+                    return await BitmapFactory.New(1, 1).FromContent(new System.Uri("ms-appx:///Images/orig-selfie-text.png"));
+            }
+
         }
 
         private async Task<StorageFile> SaveSnapshot(string fileName, FileFormat format)

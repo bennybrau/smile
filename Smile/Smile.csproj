@@ -124,8 +124,11 @@
     <Content Include="Assets\SplashScreen.scale-100.png" />
     <Content Include="Assets\StoreLogo.scale-100.png" />
     <Content Include="Audio\polaroid-camera-take-picture-01.mp3" />
+    <Content Include="Images\beunmissable-text.png" />
+    <Content Include="Images\cannes2016-text.png" />
     <Content Include="Images\hand_polaroid_black.jpg" />
     <Content Include="Images\hand_polaroid_white.jpg" />
+    <Content Include="Images\orig-selfie-text.png" />
     <Content Include="Images\polaroid_logo.jpg" />
     <Content Include="Images\polaroid_snap_1080p.jpg" />
   </ItemGroup>
