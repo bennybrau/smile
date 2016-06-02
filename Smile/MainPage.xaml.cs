@@ -24,6 +24,7 @@ namespace Smile
         private bool cameraSoundLoaded = false;
         private DispatcherTimer cameraTimer;
         private DispatcherTimer faceInLensCheckingTimer;
+        private DispatcherTimer engagementTimer;
         private int countdownValue = 3;
 
         private KinectSensor sensor = null;
@@ -39,6 +40,7 @@ namespace Smile
 
         private WriteableBitmap curColorBitmap = null;
         private StorageFile curSnapshot = null;
+        private int notSmilingCount = 0;
 
         private Random rnd = new Random();
 
@@ -138,11 +140,29 @@ namespace Smile
         private void FadeInText_Completed(object sender, object e)
         {
             //Delay and show Camera  TODO...need to wait until user is "engaged"...not just delay
+            this.engagementTimer = new DispatcherTimer();
+            this.engagementTimer.Tick += EngagementTimer_Tick;
+            this.engagementTimer.Interval = new TimeSpan(0, 0, 0, 0, 500);
+            this.engagementTimer.Start();
 
             //Pause(10000);
-            this.SmileTitle.Opacity = 0;
+            /*this.SmileTitle.Opacity = 0;
             this.PolaroidLogo.Opacity = 0;
-            FadeInCamera.Begin();
+            FadeInCamera.Begin();*/
+        }
+
+        private void EngagementTimer_Tick(object sender, object e)
+        {
+            if (curFaceResult == null) return;
+
+            DetectionResult isLookingAway = curFaceResult.FaceProperties[FaceProperty.LookingAway];
+            DetectionResult isEngaged = curFaceResult.FaceProperties[FaceProperty.Engaged];
+            if ((isEngaged == DetectionResult.Yes) || (isEngaged == DetectionResult.Maybe))
+            {
+                this.engagementTimer.Stop();
+                this.SmileTitle.Opacity = 0;
+                this.FadeInCamera.Begin();
+            }
         }
 
         private async void Pause(int millsDelay)
@@ -176,13 +196,33 @@ namespace Smile
         }
 
         private void FadeInCamera_Completed(object sender, object e)
-        { 
+        {
 
             //start timer to check if user's face is within the lens area of the background
+            this.Instructions.Text = "Smile!";
+            this.Instructions.Opacity = 1;
             this.faceInLensCheckingTimer = new DispatcherTimer();
             this.faceInLensCheckingTimer.Tick += FaceInLensCheckingTimer_Tick;
             this.faceInLensCheckingTimer.Interval = new TimeSpan(0, 0, 0, 0, 500);  //500 ms
             this.faceInLensCheckingTimer.Start();
+        }
+
+        private void TakePicture()
+        {
+            this.notSmilingCount = 0;
+            if (this.showFaceBoundaryBox)
+            {
+                this.FaceBoundary.Fill = new SolidColorBrush(Colors.GreenYellow);
+            }
+            this.faceInLensCheckingTimer.Stop();
+
+            this.Instructions.Opacity = 0;
+            this.CountdownValue.Text = this.CountdownVal;
+            this.CountdownValue.Opacity = 1;
+            cameraTimer = new DispatcherTimer();
+            cameraTimer.Tick += CameraTimer_Tick;
+            cameraTimer.Interval = new TimeSpan(0, 0, 1);
+            cameraTimer.Start();
         }
 
         private void FaceInLensCheckingTimer_Tick(object sender, object e)
@@ -193,19 +233,20 @@ namespace Smile
             DetectionResult isHappy = curFaceResult.FaceProperties[FaceProperty.Happy];
             if ((isHappy == DetectionResult.Maybe) || (isHappy == DetectionResult.Yes))
             {
-                this.FaceBoundary.Fill = new SolidColorBrush(Colors.GreenYellow);
-                this.faceInLensCheckingTimer.Stop();
-
-                this.CountdownValue.Text = this.CountdownVal;
-                this.CountdownValue.Opacity = 1;
-                cameraTimer = new DispatcherTimer();
-                cameraTimer.Tick += CameraTimer_Tick;
-                cameraTimer.Interval = new TimeSpan(0, 0, 1);
-                cameraTimer.Start();
+                TakePicture();
             }
             else
             {
-                this.FaceBoundary.Fill = null;
+                this.notSmilingCount += 1;
+                if (this.notSmilingCount >= 16)
+                {
+                    this.Instructions.Text = "Fine. Whatever.";
+                    TakePicture();
+                }
+                else if (this.notSmilingCount >= 8)
+                {
+                    this.Instructions.Text = "Come on! Smile.";
+                }
             }
 
         }
@@ -215,10 +256,17 @@ namespace Smile
             //crop and create composite image to show
             WriteableBitmap original = await BitmapFactory.New(1, 1).FromPixelBuffer(this.curColorBitmap.PixelBuffer, this.curColorBitmap.PixelWidth, this.curColorBitmap.PixelHeight);
             WriteableBitmap background = await BitmapFactory.New(1, 1).FromContent(new System.Uri("ms-appx:///Images/hand_polaroid_black.jpg"));
-            WriteableBitmap cropped = original.Crop(this.faceBoundsInColorSpace.Left - 100, this.faceBoundsInColorSpace.Top - 120, 
-                                (this.faceBoundsInColorSpace.Right - this.faceBoundsInColorSpace.Left + 200), 
-                                (this.faceBoundsInColorSpace.Bottom - this.faceBoundsInColorSpace.Top + 240));
+            WriteableBitmap cropped = original.Crop(this.faceBoundsInColorSpace.Left - 200, this.faceBoundsInColorSpace.Top - 240, 
+                                (this.faceBoundsInColorSpace.Right - this.faceBoundsInColorSpace.Left + 400), 
+                                (this.faceBoundsInColorSpace.Bottom - this.faceBoundsInColorSpace.Top + 480));
+            WriteableBitmap beachBkgrd = await BitmapFactory.New(1, 1).FromContent(new System.Uri("ms-appx:///Images/cannes-background.jpg"));
+            WriteableBitmap croppedBeachBkgrd = beachBkgrd.Crop(1130, 1220,
+                                (this.faceBoundsInColorSpace.Right - this.faceBoundsInColorSpace.Left + 400),
+                                (this.faceBoundsInColorSpace.Bottom - this.faceBoundsInColorSpace.Top + 440));
             WriteableBitmap sizedImage = cropped.Resize(810, 830, WriteableBitmapExtensions.Interpolation.Bilinear);
+            
+            WriteableBitmap sizedBkgrd = croppedBeachBkgrd.Resize(810, 830, WriteableBitmapExtensions.Interpolation.Bilinear);
+            //background.Blit(new Rect(825, 555, 810, 830), sizedBkgrd, new Rect(0, 0, 810, 830), WriteableBitmapExtensions.BlendMode.None);
             background.Blit(new Rect(825, 555, 810, 830), sizedImage, new Rect(0, 0, 810, 830), WriteableBitmapExtensions.BlendMode.None);
 
             //caption

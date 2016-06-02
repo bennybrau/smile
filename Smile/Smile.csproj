@@ -125,6 +125,7 @@
     <Content Include="Assets\StoreLogo.scale-100.png" />
     <Content Include="Audio\polaroid-camera-take-picture-01.mp3" />
     <Content Include="Images\beunmissable-text.png" />
+    <Content Include="Images\cannes-background.jpg" />
     <Content Include="Images\cannes2016-text.png" />
     <Content Include="Images\hand_polaroid_black.jpg" />
     <Content Include="Images\hand_polaroid_white.jpg" />
