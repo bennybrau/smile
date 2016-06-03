@@ -56,7 +56,7 @@ namespace Smile
         public MainPage()
         {
             this.sensor = KinectSensor.GetDefault();
-            this.multiSrcFrameReader = this.sensor.OpenMultiSourceFrameReader(FrameSourceTypes.Body | FrameSourceTypes.Color);
+            this.multiSrcFrameReader = this.sensor.OpenMultiSourceFrameReader(FrameSourceTypes.Body | FrameSourceTypes.Color | FrameSourceTypes.BodyIndex | FrameSourceTypes.Depth);
             this.multiSrcFrameReader.MultiSourceFrameArrived += MultiSrcFrameReader_MultiSourceFrameArrived;
 
             
@@ -113,6 +113,9 @@ namespace Smile
             MultiSourceFrame frame = args.FrameReference.AcquireFrame();
             if (frame == null) return;
 
+            using (ColorFrame colorFrame = frame.ColorFrameReference.AcquireFrame())
+            using (DepthFrame depthFrame = frame.DepthFrameReference.AcquireFrame())
+            using (BodyIndexFrame bodyIndexFrame = frame.BodyIndexFrameReference.AcquireFrame())
             using (BodyFrame bodyFrame = frame.BodyFrameReference.AcquireFrame())
             {
                 if (bodyFrame == null) return;
@@ -123,13 +126,12 @@ namespace Smile
                 {
                     this.faceSrc.TrackingId = firstTrackedBody.TrackingId;
                 }
-            }
 
-            using (ColorFrame colorFrame = frame.ColorFrameReference.AcquireFrame())
-            {
                 if (colorFrame == null) return;
                 this.curColorBitmap = colorFrame.ToBitmap();
             }
+
+           
         }
 
         private void Page_Loaded(object sender, RoutedEventArgs e)

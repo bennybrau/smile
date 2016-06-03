@@ -5,8 +5,8 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
+using Windows.UI.Xaml.Media.Imaging;
+using WindowsPreview.Kinect;
 
 namespace KinectBackgroundRemoval
 {
@@ -25,12 +25,12 @@ namespace KinectBackgroundRemoval
         /// <summary>
         /// Default format.
         /// </summary>
-        readonly PixelFormat FORMAT = PixelFormats.Bgra32;
+       // readonly PixelFormat FORMAT = PixelFormats.Bgra32;
 
         /// <summary>
         /// Bytes per pixel.
         /// </summary>
-        readonly int BYTES_PER_PIXEL = (PixelFormats.Bgr32.BitsPerPixel + 7) / 8;
+        readonly int BYTES_PER_PIXEL = (32 + 7) / 8;
 
         #endregion
 
@@ -113,7 +113,7 @@ namespace KinectBackgroundRemoval
                 _colorData = new byte[colorWidth * colorHeight * BYTES_PER_PIXEL];
                 _displayPixels = new byte[depthWidth * depthHeight * BYTES_PER_PIXEL];
                 _colorPoints = new ColorSpacePoint[depthWidth * depthHeight];
-                _bitmap = new WriteableBitmap(depthWidth, depthHeight, DPI, DPI, FORMAT, null);
+                _bitmap = new WriteableBitmap(depthWidth, depthHeight);
             }
 
             if (((depthWidth * depthHeight) == _depthData.Length) && ((colorWidth * colorHeight * BYTES_PER_PIXEL) == _colorData.Length) && ((bodyIndexWidth * bodyIndexHeight) == _bodyData.Length))
@@ -164,12 +164,12 @@ namespace KinectBackgroundRemoval
                     }
                 }
 
-                _bitmap.Lock();
+                //_bitmap.Lock();
+                _bitmap = _bitmap.FromByteArray(_displayPixels, 0, _displayPixels.Length);
+                //Marshal.Copy(_displayPixels, 0, _bitmap.BackBuffer, _displayPixels.Length);
+                //_bitmap.AddDirtyRect(new Int32Rect(0, 0, depthWidth, depthHeight));
 
-                Marshal.Copy(_displayPixels, 0, _bitmap.BackBuffer, _displayPixels.Length);
-                _bitmap.AddDirtyRect(new Int32Rect(0, 0, depthWidth, depthHeight));
-
-                _bitmap.Unlock();
+                //_bitmap.Unlock();
             }
 
             return _bitmap;
