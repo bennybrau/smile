@@ -35,14 +35,15 @@ namespace Smile
         FaceFrameSource faceSrc = null;
         FaceFrameReader faceReader = null;
         FaceFrameResult curFaceResult = null;
-        RectI faceBoundsInColorSpace;
-        private bool showFaceBoundaryBox = true;
+        RectI faceBoundsInDepthSpace;
+        private bool showFaceBoundaryBox = false;
 
         private WriteableBitmap curColorBitmap = null;
         private StorageFile curSnapshot = null;
         private int notSmilingCount = 0;
 
         private Random rnd = new Random();
+        private BackgroundRemovalTool backgroundRemovalTool;
 
         public string CountdownVal
         {
@@ -58,13 +59,12 @@ namespace Smile
             this.sensor = KinectSensor.GetDefault();
             this.multiSrcFrameReader = this.sensor.OpenMultiSourceFrameReader(FrameSourceTypes.Body | FrameSourceTypes.Color | FrameSourceTypes.BodyIndex | FrameSourceTypes.Depth);
             this.multiSrcFrameReader.MultiSourceFrameArrived += MultiSrcFrameReader_MultiSourceFrameArrived;
-
-            
+            this.backgroundRemovalTool = new BackgroundRemovalTool(this.sensor.CoordinateMapper);
 
             this.curColorFrameDescription = this.sensor.ColorFrameSource.FrameDescription;
             this.curColorBitmap = new WriteableBitmap(this.curColorFrameDescription.Width, this.curColorFrameDescription.Height);
             this.bodies = new Body[this.sensor.BodyFrameSource.BodyCount];
-            this.faceSrc = new FaceFrameSource(this.sensor, 0, FaceFrameFeatures.BoundingBoxInColorSpace |
+            this.faceSrc = new FaceFrameSource(this.sensor, 0, FaceFrameFeatures.BoundingBoxInInfraredSpace |
                                                                FaceFrameFeatures.FaceEngagement |
                                                                FaceFrameFeatures.Glasses |
                                                                FaceFrameFeatures.Happy |
@@ -81,31 +81,31 @@ namespace Smile
 
         private void FaceReader_FrameArrived(FaceFrameReader sender, FaceFrameArrivedEventArgs args)
         {
-            if (this.showFaceBoundaryBox)
-            {
+            
                 using (FaceFrame frame = args.FrameReference.AcquireFrame())
                 {
                     if (frame == null) return;
                     curFaceResult = frame.FaceFrameResult;
                     if (curFaceResult == null) return;
-                    this.faceBoundsInColorSpace = curFaceResult.FaceBoundingBoxInColorSpace;
+                    this.faceBoundsInDepthSpace = curFaceResult.FaceBoundingBoxInInfraredSpace;
 
-                    if ((this.faceBoundsInColorSpace.Left > 0) && (this.faceBoundsInColorSpace.Top > 0) &&
-                        (this.faceBoundsInColorSpace.Right > 0) && (this.faceBoundsInColorSpace.Bottom > 0))
+                    if (this.showFaceBoundaryBox)
                     {
-                        this.FaceBoundary.Width = (this.faceBoundsInColorSpace.Right - this.faceBoundsInColorSpace.Left);
-                        this.FaceBoundary.Height = (this.faceBoundsInColorSpace.Bottom - this.faceBoundsInColorSpace.Top);
-                        Canvas.SetLeft(this.FaceBoundary, this.faceBoundsInColorSpace.Left);
-                        Canvas.SetTop(this.FaceBoundary, this.faceBoundsInColorSpace.Top);
-                        this.FaceBoundary.Visibility = Visibility.Visible;
-                    }
-                    else
-                    {
-                        this.FaceBoundary.Visibility = Visibility.Collapsed;
+                        if ((this.faceBoundsInDepthSpace.Left > 0) && (this.faceBoundsInDepthSpace.Top > 0) &&
+                            (this.faceBoundsInDepthSpace.Right > 0) && (this.faceBoundsInDepthSpace.Bottom > 0))
+                        {
+                            this.FaceBoundary.Width = (this.faceBoundsInDepthSpace.Right - this.faceBoundsInDepthSpace.Left);
+                            this.FaceBoundary.Height = (this.faceBoundsInDepthSpace.Bottom - this.faceBoundsInDepthSpace.Top);
+                            Canvas.SetLeft(this.FaceBoundary, this.faceBoundsInDepthSpace.Left);
+                            Canvas.SetTop(this.FaceBoundary, this.faceBoundsInDepthSpace.Top);
+                            this.FaceBoundary.Visibility = Visibility.Visible;
+                        }
+                        else
+                        {
+                            this.FaceBoundary.Visibility = Visibility.Collapsed;
+                        }
                     }
                 }
-            }
-            
         }
 
         private void MultiSrcFrameReader_MultiSourceFrameArrived(MultiSourceFrameReader sender, MultiSourceFrameArrivedEventArgs args)
@@ -118,20 +118,21 @@ namespace Smile
             using (BodyIndexFrame bodyIndexFrame = frame.BodyIndexFrameReference.AcquireFrame())
             using (BodyFrame bodyFrame = frame.BodyFrameReference.AcquireFrame())
             {
-                if (bodyFrame == null) return;
-                bodyFrame.GetAndRefreshBodyData(this.bodies);
-                Body firstTrackedBody = this.bodies.Where(b => b.IsTracked).FirstOrDefault();
-
-                if ((!this.faceSrc.IsTrackingIdValid) && (firstTrackedBody != null))
+                if ((colorFrame != null) && (bodyFrame != null) && (depthFrame != null) && (bodyIndexFrame != null))
                 {
-                    this.faceSrc.TrackingId = firstTrackedBody.TrackingId;
+                    bodyFrame.GetAndRefreshBodyData(this.bodies);
+                    Body firstTrackedBody = this.bodies.Where(b => b.IsTracked).FirstOrDefault();
+
+                    if ((!this.faceSrc.IsTrackingIdValid) && (firstTrackedBody != null))
+                    {
+                        this.faceSrc.TrackingId = firstTrackedBody.TrackingId;
+                    }
+
+                    BitmapSource wb = backgroundRemovalTool.GreenScreen(colorFrame, depthFrame, bodyIndexFrame);
+                    //this.CameraImage.Source = wb;
+                    this.curColorBitmap = (WriteableBitmap)wb;
                 }
-
-                if (colorFrame == null) return;
-                this.curColorBitmap = colorFrame.ToBitmap();
             }
-
-           
         }
 
         private void Page_Loaded(object sender, RoutedEventArgs e)
@@ -141,16 +142,10 @@ namespace Smile
 
         private void FadeInText_Completed(object sender, object e)
         {
-            //Delay and show Camera  TODO...need to wait until user is "engaged"...not just delay
             this.engagementTimer = new DispatcherTimer();
             this.engagementTimer.Tick += EngagementTimer_Tick;
             this.engagementTimer.Interval = new TimeSpan(0, 0, 0, 0, 500);
             this.engagementTimer.Start();
-
-            //Pause(10000);
-            /*this.SmileTitle.Opacity = 0;
-            this.PolaroidLogo.Opacity = 0;
-            FadeInCamera.Begin();*/
         }
 
         private void EngagementTimer_Tick(object sender, object e)
@@ -229,7 +224,7 @@ namespace Smile
 
         private void FaceInLensCheckingTimer_Tick(object sender, object e)
         {
-            System.Diagnostics.Debug.WriteLine("Face Bounds: Left = " + this.faceBoundsInColorSpace.Left.ToString() + " Right = " + this.faceBoundsInColorSpace.Right.ToString() + " Top = " + this.faceBoundsInColorSpace.Top.ToString() + " Bottom = " + this.faceBoundsInColorSpace.Bottom.ToString());
+            System.Diagnostics.Debug.WriteLine("Face Bounds: Left = " + this.faceBoundsInDepthSpace.Left.ToString() + " Right = " + this.faceBoundsInDepthSpace.Right.ToString() + " Top = " + this.faceBoundsInDepthSpace.Top.ToString() + " Bottom = " + this.faceBoundsInDepthSpace.Bottom.ToString());
             if (curFaceResult == null) return;
 
             DetectionResult isHappy = curFaceResult.FaceProperties[FaceProperty.Happy];
@@ -256,20 +251,19 @@ namespace Smile
         private async void FlashFade_Completed(object sender, object e)
         {
             //crop and create composite image to show
+            //GreenScreened original image is 512x424 (Depth resolution)
             WriteableBitmap original = await BitmapFactory.New(1, 1).FromPixelBuffer(this.curColorBitmap.PixelBuffer, this.curColorBitmap.PixelWidth, this.curColorBitmap.PixelHeight);
             WriteableBitmap background = await BitmapFactory.New(1, 1).FromContent(new System.Uri("ms-appx:///Images/hand_polaroid_black.jpg"));
-            WriteableBitmap cropped = original.Crop(this.faceBoundsInColorSpace.Left - 200, this.faceBoundsInColorSpace.Top - 240, 
-                                (this.faceBoundsInColorSpace.Right - this.faceBoundsInColorSpace.Left + 400), 
-                                (this.faceBoundsInColorSpace.Bottom - this.faceBoundsInColorSpace.Top + 480));
+            WriteableBitmap cropped = original.Crop(this.faceBoundsInDepthSpace.Left - 100, this.faceBoundsInDepthSpace.Top - 120, 
+                                (this.faceBoundsInDepthSpace.Right - this.faceBoundsInDepthSpace.Left + 200), 
+                                (this.faceBoundsInDepthSpace.Bottom - this.faceBoundsInDepthSpace.Top + 240));
             WriteableBitmap beachBkgrd = await BitmapFactory.New(1, 1).FromContent(new System.Uri("ms-appx:///Images/cannes-background.jpg"));
-            WriteableBitmap croppedBeachBkgrd = beachBkgrd.Crop(1130, 1220,
-                                (this.faceBoundsInColorSpace.Right - this.faceBoundsInColorSpace.Left + 400),
-                                (this.faceBoundsInColorSpace.Bottom - this.faceBoundsInColorSpace.Top + 440));
+            WriteableBitmap croppedBeachBkgrd = beachBkgrd.Crop(0, 1000, 2000, 2000);
             WriteableBitmap sizedImage = cropped.Resize(810, 830, WriteableBitmapExtensions.Interpolation.Bilinear);
             
             WriteableBitmap sizedBkgrd = croppedBeachBkgrd.Resize(810, 830, WriteableBitmapExtensions.Interpolation.Bilinear);
-            //background.Blit(new Rect(825, 555, 810, 830), sizedBkgrd, new Rect(0, 0, 810, 830), WriteableBitmapExtensions.BlendMode.None);
-            background.Blit(new Rect(825, 555, 810, 830), sizedImage, new Rect(0, 0, 810, 830), WriteableBitmapExtensions.BlendMode.None);
+            background.Blit(new Rect(825, 555, 810, 830), sizedBkgrd, new Rect(0, 0, 810, 830), WriteableBitmapExtensions.BlendMode.None);
+            background.Blit(new Rect(825, 555, 810, 830), sizedImage, new Rect(0, 0, 810, 830), WriteableBitmapExtensions.BlendMode.Alpha);
 
             //caption
             WriteableBitmap textBmp = await GetRandomCaption();

@@ -8,7 +8,7 @@ using System.Windows;
 using Windows.UI.Xaml.Media.Imaging;
 using WindowsPreview.Kinect;
 
-namespace KinectBackgroundRemoval
+namespace Smile
 {
     /// <summary>
     /// Provides extension methods for removing the background of a Kinect frame.
